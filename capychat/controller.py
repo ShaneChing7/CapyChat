@@ -298,14 +298,28 @@ class ChatController(QObject):
         if bar:
             bar.set_done()
             QTimer.singleShot(3000, lambda: self._remove_progress_bar(file_id))
-        self.file_meta.pop(file_id, None)
+        meta = self.file_meta.pop(file_id, None)
+        # 在对应聊天区域显示友好提示
+        if meta:
+            _, _, _, addr = meta
+            area = self.window.chat_areas.get(addr)
+            if area:
+                area.add_system_msg(f"✅ 文件发送完成: {file_name}")
 
     def _on_file_cancelled(self, file_id) -> None:
         bar = self.progress_bars.get(file_id)
+        file_name = bar.file_name if bar else ""
         if bar:
             bar.set_error("已取消")
             QTimer.singleShot(3000, lambda: self._remove_progress_bar(file_id))
-        self.file_meta.pop(file_id, None)
+        meta = self.file_meta.pop(file_id, None)
+        # 在对应聊天区域显示友好提示
+        if meta:
+            file_name = file_name or meta[0]
+            _, _, _, addr = meta
+            area = self.window.chat_areas.get(addr)
+            if area:
+                area.add_system_msg(f"❌ 文件传输已取消: {file_name}")
 
     # ==================================================================
     # Capybara AI
@@ -493,11 +507,17 @@ class ChatController(QObject):
             for addr in list(self.window.chat_areas.keys()):
                 if addr != "group" and self.tcp:
                     ip, port = addr.split(":")
-                    self.tcp.send_file(ip, int(port), file_path)
+                    file_id = self.tcp.send_file(ip, int(port), file_path)
+                    if file_id:
+                        self.file_meta[file_id] = (name, size, self.username, addr)
+                        self._add_progress_bar(file_id, name, size)
         else:
             ip, port = channel_id.split(":")
             if self.tcp:
-                self.tcp.send_file(ip, int(port), file_path)
+                file_id = self.tcp.send_file(ip, int(port), file_path)
+                if file_id:
+                    self.file_meta[file_id] = (name, size, self.username, channel_id)
+                    self._add_progress_bar(file_id, name, size)
 
     # ==================================================================
     # Emoji / 文档中心
@@ -545,7 +565,7 @@ class ChatController(QObject):
     # ==================================================================
 
     def _add_progress_bar(self, file_id: str, name: str, size: int) -> None:
-        from chat_ui import _ProgressBar
+        from views.chat_ui import _ProgressBar
         bar = _ProgressBar(name, size)
         bar.cancelled.connect(lambda: self._cancel_transfer(file_id))
         self.progress_bars[file_id] = bar
@@ -557,9 +577,10 @@ class ChatController(QObject):
                 bar.set_done()
 
     def _cancel_transfer(self, file_id: str) -> None:
-        if self.window.current_channel != "group":
-            ip, port = self.window.current_channel.split(":")
-            self.tcp.cancel_transfer(self.window.current_channel, file_id)
+        meta = self.file_meta.get(file_id)
+        if meta:
+            _, _, _, addr = meta
+            self.tcp.cancel_transfer(addr, file_id)
         bar = self.progress_bars.get(file_id)
         if bar:
             bar.set_error("已取消")

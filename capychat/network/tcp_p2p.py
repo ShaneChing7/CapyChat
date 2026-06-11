@@ -189,15 +189,15 @@ class TcpP2P(QObject):
     # 文件传输（委托给 FileTransferManager）
     # ==================================================================
 
-    def send_file(self, peer_ip: str, peer_port: int, file_path: str) -> bool:
+    def send_file(self, peer_ip: str, peer_port: int, file_path: str) -> Optional[str]:
+        """发送文件，返回 file_id 用于追踪进度，失败返回 None。"""
         addr = f"{peer_ip}:{peer_port}"
         if not os.path.exists(file_path):
             self.error.emit(f"文件不存在: {file_path}")
-            return False
+            return None
         if not self._ensure_connected(peer_ip, peer_port):
-            return False
-        file_id = self.file_mgr.send_file(addr, file_path)
-        return file_id is not None
+            return None
+        return self.file_mgr.send_file(addr, file_path)
 
     def send_files(self, peer_ip: str, peer_port: int,
                    file_paths: list[str]):

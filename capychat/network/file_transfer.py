@@ -181,6 +181,12 @@ class FileTransferManager(QObject):
         self._transfer_queue: deque[QueuedFile] = deque()
         self._lock = threading.Lock()
 
+        # --- 取消标记集合（与 _active_transfer 解耦，避免上传/下载互相覆盖）---
+        self._cancelled_files: set[str] = set()
+
+        # --- 真实TCP连接地址（file_id → 实际 socket 地址，非监听端口）---
+        self._file_peers: dict[str, str] = {}
+
         # --- 压缩设置 ---
         self.compression_enabled = True
         self.compression_level = 6
@@ -246,37 +252,61 @@ class FileTransferManager(QObject):
         self._process_queue()
 
     def cancel_transfer(self, peer_addr: str, file_id: str = ""):
-        """取消传输。如果 file_id 为空则取消该地址的所有传输。"""
-        with self._lock:
-            # 取消活跃传输
-            if self._active_transfer and self._active_transfer.peer_addr == peer_addr:
-                if not file_id or self._active_transfer.file_id == file_id:
-                    self._active_transfer.cancelled = True
+        """取消传输。file_id 为空则取消该地址的所有传输。"""
+        cancelled_ids: list[str] = []
 
-            # 取消等待响应的发送
+        with self._lock:
+            # --- 收集要取消的 file_id ---
             if file_id:
+                self._cancelled_files.add(file_id)
+                cancelled_ids.append(file_id)
                 self._waiting_response.discard(file_id)
             else:
+                # 取消该地址所有活跃 / 等待中的传输
+                if self._active_transfer and \
+                   self._active_transfer.peer_addr == peer_addr:
+                    fid = self._active_transfer.file_id
+                    self._cancelled_files.add(fid)
+                    cancelled_ids.append(fid)
+                # 等待响应中的
+                for rid in list(self._waiting_response):
+                    # 从队列中查找对应 addr
+                    for qf in self._transfer_queue:
+                        if qf.file_id == rid and qf.addr == peer_addr:
+                            self._cancelled_files.add(rid)
+                            cancelled_ids.append(rid)
+                            break
                 self._waiting_response.clear()
 
-            # 从队列中移除等待项
-            removed = []
-            keep = deque()
+            # --- 标记队列项 ---
             for qf in self._transfer_queue:
-                if qf.addr == peer_addr and qf.status == "waiting":
-                    if not file_id or qf.file_id == file_id:
-                        qf.status = "cancelled"
-                        removed.append(qf.file_id)
-                        continue
-                keep.append(qf)
-            self._transfer_queue = keep
+                if qf.file_id in self._cancelled_files:
+                    qf.status = "cancelled"
 
-        # 通知对方
-        cancel_id = file_id if file_id else (removed[0] if removed else "")
-        if cancel_id:
-            self._send(peer_addr, build_tcp_message(MSG_FILE_CANCEL, key=self._key,
-                        file_id=cancel_id))
-        for fid in removed:
+            # --- 清理队列 ---
+            self._transfer_queue = deque(
+                qf for qf in self._transfer_queue
+                if qf.status not in ("cancelled",))
+
+            # --- 清除 active_transfer ---
+            if self._active_transfer and \
+               self._active_transfer.file_id in self._cancelled_files:
+                self._active_transfer = None
+
+            # --- 清理 pending_requests ---
+            for fid in cancelled_ids:
+                self._pending_requests.pop(fid, None)
+
+        # --- 通知对方 + 发射 UI 信号 ---
+        for fid in cancelled_ids:
+            # 用真实TCP连接地址（非监听端口），否则取消消息发不到对方
+            actual_addr = self._file_peers.get(fid, peer_addr)
+            self._send(actual_addr,
+                       build_tcp_message(MSG_FILE_CANCEL, key=self._key,
+                                         file_id=fid))
+            pg = TransferProgress(file_id=fid, cancelled=True,
+                                  error_msg="已取消")
+            self.file_progress.emit(pg)
             self.file_cancelled.emit(fid)
 
     # ==================================================================
@@ -328,19 +358,22 @@ class FileTransferManager(QObject):
         compressed_flag = header.get("compressed", False)
         progress = None
 
+        # --- 取消检查（用集合，与 _active_transfer 解耦）---
+        with self._lock:
+            if file_id in self._cancelled_files:
+                return
+
         try:
             with self._lock:
                 ft = self._active_transfer
                 if ft is None or ft.file_id != file_id:
-                    return
-                if ft.cancelled:
                     return
 
                 # 解压
                 try:
                     chunk_data = decompress_chunk(data, compressed_flag)
                 except Exception as e:
-                    ft.cancelled = True
+                    self._cancelled_files.add(file_id)
                     pg = TransferProgress(
                         file_id=ft.file_id, file_name=ft.file_name,
                         file_size=ft.file_size)
@@ -397,8 +430,8 @@ class FileTransferManager(QObject):
         except Exception as e:
             # 块处理异常：取消传输但不终止连接
             with self._lock:
+                self._cancelled_files.add(file_id)
                 if self._active_transfer and self._active_transfer.file_id == file_id:
-                    self._active_transfer.cancelled = True
                     self._active_transfer = None
             pg = TransferProgress(file_id=file_id, error_msg=f"接收出错: {e}",
                                   cancelled=True)
@@ -443,6 +476,8 @@ class FileTransferManager(QObject):
             peer_addr=peer_addr, compressed=compressed)
         with self._lock:
             self._pending_requests[file_id] = ft
+            # 记录真实TCP连接地址（用于取消时发消息到正确socket）
+            self._file_peers[file_id] = peer_addr
 
     def _on_response(self, msg: dict):
         accepted = msg.get("accepted", False)
@@ -450,7 +485,10 @@ class FileTransferManager(QObject):
         with self._lock:
             self._waiting_response.discard(file_id)
         if accepted:
-            # 对方同意 → 启动发送线程
+            # 对方同意 → 如果还未被取消，启动发送线程
+            with self._lock:
+                if file_id in self._cancelled_files:
+                    return
             qf = None
             with self._lock:
                 for q in self._transfer_queue:
@@ -466,7 +504,6 @@ class FileTransferManager(QObject):
             # 对方拒绝
             with self._lock:
                 if self._active_transfer and self._active_transfer.file_id == file_id:
-                    self._active_transfer.cancelled = True
                     self._active_transfer = None
                 for q in self._transfer_queue:
                     if q.file_id == file_id:
@@ -476,7 +513,9 @@ class FileTransferManager(QObject):
             self._process_queue()
 
     def _on_complete(self, msg: dict):
+        """收到对方 MSG_FILE_COMPLETE —— 文件传输真正完成。"""
         file_id = msg.get("file_id", "")
+        file_name = ""
         with self._lock:
             if self._active_transfer and self._active_transfer.file_id == file_id:
                 self._active_transfer.received_bytes = self._active_transfer.file_size
@@ -485,16 +524,20 @@ class FileTransferManager(QObject):
             for qf in self._transfer_queue:
                 if qf.file_id == file_id:
                     qf.status = "done"
+                    file_name = qf.file_name
                     break
+        if file_name:
+            self.file_sent.emit(file_id, file_name)
         self._process_queue()
 
     def _on_cancel(self, msg: dict):
         file_id = msg.get("file_id", "")
         with self._lock:
+            self._cancelled_files.add(file_id)
             self._waiting_response.discard(file_id)
             self._pending_requests.pop(file_id, None)
             if self._active_transfer and self._active_transfer.file_id == file_id:
-                self._active_transfer.cancelled = True
+                self._active_transfer = None
             for qf in self._transfer_queue:
                 if qf.file_id == file_id:
                     qf.status = "cancelled"
@@ -516,11 +559,19 @@ class FileTransferManager(QObject):
         try:
             with open(qf.file_path, "rb") as f:
                 for i in range(total_chunks):
-                    # 检查取消
+                    # --- 检查取消（用集合，与 _active_transfer 解耦）---
                     with self._lock:
-                        if self._active_transfer and \
-                           self._active_transfer.cancelled:
+                        if qf.file_id in self._cancelled_files:
                             qf.status = "cancelled"
+                            pg = TransferProgress(
+                                file_id=qf.file_id,
+                                file_name=qf.file_name,
+                                file_size=qf.file_size,
+                                cancelled=True,
+                                error_msg="已取消",
+                                direction="upload")
+                            self.file_progress.emit(pg)
+                            self.file_cancelled.emit(qf.file_id)
                             return
 
                     chunk_data = f.read(TCP_CHUNK_SIZE)
@@ -547,6 +598,25 @@ class FileTransferManager(QObject):
                         self.file_cancelled.emit(qf.file_id)
                         return
 
+                    # --- 每个 chunk 发送后立即检查取消（捕获对方在此期间发出的取消）---
+                    with self._lock:
+                        if qf.file_id in self._cancelled_files:
+                            qf.status = "cancelled"
+                            pg = TransferProgress(
+                                file_id=qf.file_id,
+                                file_name=qf.file_name,
+                                file_size=qf.file_size,
+                                cancelled=True,
+                                error_msg="已取消",
+                                direction="upload")
+                            self.file_progress.emit(pg)
+                            self.file_cancelled.emit(qf.file_id)
+                            return
+
+                    # 每 5 个 chunk 让出 CPU，给取消消息处理窗口
+                    if i % 5 == 0:
+                        time.sleep(0.001)
+
                     sent_bytes += len(chunk_data)
                     recent_samples.append((time.time(), len(chunk_data)))
 
@@ -558,14 +628,21 @@ class FileTransferManager(QObject):
                             qf, sent_bytes, start_time, recent_samples)
                         last_progress_time = now
 
-            # 发送完成
+            # 对方可能在发送过程中取消了，发送完成前最后检查一次
+            with self._lock:
+                if qf.file_id in self._cancelled_files:
+                    # _on_cancel 已发出 file_cancelled 信号，直接退出即可
+                    qf.status = "cancelled"
+                    return
+
+            # 数据已全部写入 socket，等待对方 MSG_FILE_COMPLETE 确认
             qf.status = "done"
             pg = TransferProgress(qf.file_id, qf.file_name, qf.file_size)
             pg.received_bytes = sent_bytes
             pg.done = True
             pg.direction = "upload"
             self.file_progress.emit(pg)
-            self.file_sent.emit(qf.file_id, qf.file_name)
+            # 不在此处 emit file_sent —— 等收到对方 MSG_FILE_COMPLETE 才算真正完成
 
         except Exception as e:
             qf.status = "error"
@@ -582,6 +659,8 @@ class FileTransferManager(QObject):
                 if self._active_transfer and \
                    self._active_transfer.file_id == qf.file_id:
                     self._active_transfer = None
+                # 清理取消标记
+                self._cancelled_files.discard(qf.file_id)
             self._process_queue()
 
     def _emit_send_progress(self, qf: QueuedFile, sent_bytes: int,
@@ -621,15 +700,16 @@ class FileTransferManager(QObject):
             # 清理已完成/取消/出错的项
             self._transfer_queue = deque(
                 qf for qf in self._transfer_queue
-                if qf.status in ("waiting", "sending"))
+                if qf.status in ("waiting", "sending")
+                and qf.file_id not in self._cancelled_files)
 
             # 如果有活跃传输，等待其完成
             if self._active_transfer is not None:
                 return
 
-            # 找下一个 waiting 文件
+            # 找下一个 waiting 文件（跳过已取消的）
             for qf in self._transfer_queue:
-                if qf.status == "waiting":
+                if qf.status == "waiting" and qf.file_id not in self._cancelled_files:
                     qf.status = "sending"
                     _, ext = os.path.splitext(qf.file_name)
                     total_chunks = max(
