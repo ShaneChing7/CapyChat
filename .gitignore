@@ -21,6 +21,11 @@ capychat/received/
 # Config (may contain secrets)
 capychat/conf.json
 
+# AI tools
+.claude/
+.codex/
+.cursor/
+
 # OS
 Thumbs.db
 .DS_Store
