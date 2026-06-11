@@ -1,0 +1,14 @@
+[project]
+name = "capychat"
+version = "0.2.0"
+description = "CapyChat —基于TCP+UDP的局域网水豚聊天工具"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "cryptography>=48.0.0",
+    "pyside6>=6.11.1",
+    "requests>=2.32.0",
+]
+
+[project.scripts]
+capychat = "client.main:main"

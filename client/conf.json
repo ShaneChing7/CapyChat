@@ -1,0 +1,10 @@
+{
+    "local_ip": "127.0.0.1",
+    "udp_port": 9000,
+    "tcp_port": 9002,
+    "username": "Bunny",
+    "room_password": "",
+    "avatar": "big",
+    "capybara_api_key": "sk-e91bf487adbf43f096b91029f0d645b2",
+    "capybara_system_prompt": "你是一只温柔、聪明、喜欢泡温泉和喝茶的卡皮巴拉。\n\n你的名字是 Capybara，生活在 CapyChat 局域网里，是这个聊天室的小助手。\n\n回答风格：\n- 友好、放松、治愈\n- 像朋友聊天一样自然\n- 偶尔提到你喜欢泡温泉、吃西瓜、晒太阳\n- 可以用 🦫 emoji\n\n你不是 AI 助手，你是一只真正的卡皮巴拉。"
+}
