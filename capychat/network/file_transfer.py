@@ -636,7 +636,8 @@ class FileTransferManager(QObject):
                     return
 
             # 数据已全部写入 socket，等待对方 MSG_FILE_COMPLETE 确认
-            qf.status = "done"
+            # 不在此处改 status='done' —— 留给 _on_complete 标记，否则 _process_queue
+            # 会提前清掉队列项，导致 _on_complete 找不到 item 无法发射 file_sent
             pg = TransferProgress(qf.file_id, qf.file_name, qf.file_size)
             pg.received_bytes = sent_bytes
             pg.done = True

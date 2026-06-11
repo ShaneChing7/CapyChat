@@ -258,6 +258,25 @@ class DocumentCenterDialog(QDialog):
         refresh_btn.clicked.connect(self._refresh)
         title_row.addWidget(refresh_btn)
 
+        del_all_btn = QPushButton("全部删除")
+        del_all_btn.setCursor(Qt.PointingHandCursor)
+        del_all_btn.setStyleSheet(f"""
+            QPushButton {{
+                font-size: 12px;
+                padding: 4px 12px;
+                border: 0.5px solid #C97A7A;
+                border-radius: {RADIUS_XS}px;
+                background: transparent;
+                color: #C97A7A;
+            }}
+            QPushButton:hover {{
+                background: #C97A7A;
+                color: #fff;
+            }}
+        """)
+        del_all_btn.clicked.connect(self._on_delete_all)
+        title_row.addWidget(del_all_btn)
+
         close_btn = QPushButton("✕")
         close_btn.setCursor(Qt.PointingHandCursor)
         close_btn.setFixedSize(28, 28)
@@ -372,6 +391,32 @@ class DocumentCenterDialog(QDialog):
                 return
             self.delete_file_requested.emit(file_path)
             self._refresh()
+
+    def _on_delete_all(self):
+        """删除全部已接收文件。"""
+        if not self._received_dir or not os.path.isdir(self._received_dir):
+            return
+        files = [f for f in os.listdir(self._received_dir)
+                 if os.path.isfile(os.path.join(self._received_dir, f))
+                 and not f.startswith(".")]
+        if not files:
+            return
+        ret = QMessageBox.question(
+            self, "确认全部删除",
+            f"确定要删除文档中心全部 {len(files)} 个文件吗？\n此操作不可撤销。",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if ret != QMessageBox.Yes:
+            return
+        errors = 0
+        for name in files:
+            try:
+                os.remove(os.path.join(self._received_dir, name))
+            except OSError:
+                errors += 1
+        if errors:
+            QMessageBox.warning(self, "删除完成",
+                                f"已删除 {len(files) - errors} 个文件，{errors} 个文件删除失败。")
+        self._refresh()
 
     def _on_share(self, file_path, _):
         """弹出分享菜单：广场 + 在线用户列表。"""
