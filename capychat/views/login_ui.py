@@ -12,7 +12,7 @@ from network.udp_broadcast import UdpBroadcast
 from network.tcp_p2p import TcpP2P
 from network.protocol import DEFAULT_UDP_PORT, DEFAULT_TCP_PORT
 from network.crypto import derive_key
-from chat_ui import ChatWindow
+from views.chat_ui import ChatWindow
 from config_manager import load_config, save_config, DEFAULT_CONFIG
 
 
@@ -120,7 +120,7 @@ def _input(placeholder="", *, password=False, default_text=""):
 # 自定义 QComboBox：用 QIcon 画下拉箭头
 # ---------------------------------------------------------------------------
 
-_ICON_DIR = os.path.join(os.path.dirname(__file__), "assets", "icons")
+_ICON_DIR = os.path.join(os.path.dirname(__file__), "..", "assets", "icons")
 _CHEVRON_DOWN = QIcon(os.path.join(_ICON_DIR, "chevron-down.svg"))
 _CHEVRON_UP = QIcon(os.path.join(_ICON_DIR, "chevron-up.svg"))
 _EYE_OPEN = QIcon(os.path.join(_ICON_DIR, "eye.svg"))
@@ -340,7 +340,7 @@ class LoginWindow(QWidget):
 
         # ---- Logo 图片（背景层，不影响布局）-------------------------------
         self._logo_pixmap: QPixmap | None = None
-        logo_path = os.path.join(os.path.dirname(__file__), "assets", "images", "logo", "logo.png")
+        logo_path = os.path.join(os.path.dirname(__file__), "..", "assets", "images", "logo", "logo.png")
         if os.path.exists(logo_path):
             self._logo_pixmap = QPixmap(logo_path)
 

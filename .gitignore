@@ -1,32 +1,26 @@
 # Python
 __pycache__/
 *.py[cod]
-*.so
-
-# Virtual environment
-.venv/
-venv/
+*.egg-info/
+dist/
+build/
 
 # IDE
 .idea/
 .vscode/
-*.iml
-
-# Claude
-.claude/
-
-# Codex
-.codex/
+*.swp
+*.swo
 
 # Environment
-.env
-.python-version
+.venv/
+venv/
 
-# Distribution
-dist/
-build/
-*.egg-info/
+# Runtime data
+capychat/received/
+
+# Config (may contain secrets)
+capychat/conf.json
 
 # OS
-.DS_Store
 Thumbs.db
+.DS_Store

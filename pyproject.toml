@@ -11,4 +11,4 @@ dependencies = [
 ]
 
 [project.scripts]
-capychat = "client.main:main"
+capychat = "capychat.main:main"
