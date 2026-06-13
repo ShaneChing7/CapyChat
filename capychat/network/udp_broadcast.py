@@ -77,6 +77,12 @@ class UdpBroadcast(QObject):
                     avatar=self.avatar))
                 self._send_raw(build_udp_message(MSG_USER_LIST_REQUEST, key=self._key,
                     username=self.username))
+            # 二次请求：确保 UI 已初始化、信号已连接后再同步一次
+            # 避免首次响应在 ChatController 就绪前到达导致列表被丢弃
+            time.sleep(1.7)
+            if self.running:
+                self._send_raw(build_udp_message(MSG_USER_LIST_REQUEST, key=self._key,
+                    username=self.username))
         threading.Thread(target=_delayed_announce, daemon=True).start()
 
         print(f"[UDP] 广播模块启动 - 端口:{self.udp_port}")
@@ -114,6 +120,14 @@ class UdpBroadcast(QObject):
             MSG_USER_ONLINE, key=self._key,
             username=self.username, ip=self.local_ip,
             tcp_port=self.tcp_port, avatar=self.avatar))
+
+    def sync_user_list(self) -> None:
+        """强制重新发送当前用户列表信号。
+
+        用于 UI 初始化完成后同步已在 _users 中但信号已被丢弃的在线用户。
+        """
+        if self.running:
+            self._emit_user_list()
 
     def get_users(self) -> list:
         with self._users_lock:
@@ -249,12 +263,18 @@ class UdpBroadcast(QObject):
                             tcp_port=tcp_port, avatar=avatar
                         )
                         is_new = True
-                    elif existing.avatar != avatar:
-                        existing.avatar = avatar
-                        avatar_changed = True
+                    else:
+                        # 更新 last_seen（防止心跳清理前就过期）
+                        existing.last_seen = time.time()
+                        if existing.avatar != avatar:
+                            existing.avatar = avatar
+                            avatar_changed = True
                 if is_new or avatar_changed:
                     self.user_online.emit(username, sender_ip, tcp_port, avatar)
-                    self._emit_user_list()
+                # 列表响应是显式的状态同步，始终触发列表更新
+                # 修复：登录初期信号尚未连接时收到响应，之后心跳会因
+                # is_new=False 而跳过通知 —— 所以这里必须无条件发送
+                self._emit_user_list()
 
         elif msg_type == MSG_GROUP_MESSAGE:
             username = msg.get("username")

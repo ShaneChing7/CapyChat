@@ -183,6 +183,7 @@ class DocumentCenterDialog(QDialog):
         self.setMinimumSize(510, 340)
         self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
+        self._drag_pos = None
         self.initUI()
         self._refresh()
 
@@ -350,6 +351,26 @@ class DocumentCenterDialog(QDialog):
             }}
         """)
         root.addWidget(self._empty_lbl)
+
+    # ==================================================================
+    # 拖拽
+    # ==================================================================
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self._drag_pos = event.globalPosition().toPoint()
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._drag_pos is not None:
+            delta = event.globalPosition().toPoint() - self._drag_pos
+            self.move(self.pos() + delta)
+            self._drag_pos = event.globalPosition().toPoint()
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        self._drag_pos = None
+        super().mouseReleaseEvent(event)
 
     # ==================================================================
     # Private

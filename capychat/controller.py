@@ -81,6 +81,11 @@ class ChatController(QObject):
             self.udp.user_list_updated.connect(self._on_user_list)
             self.udp.group_message_received.connect(self._on_group_message)
             self.udp.error.connect(lambda e: print(f"[UDP] {e}"))
+            # 修复竞态：UDP 模块在 ChatWindow 创建前就已启动，
+            # 如果首次 MSG_USER_LIST_REQUEST 的响应在信号连接前到达，
+            # 用户数据已在 _users 中但 UI 永远不知道。这里主动同步一次。
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(500, self._sync_initial_users)
 
         if self.tcp:
             self.tcp.private_message_received.connect(self._on_private_message)
@@ -198,6 +203,15 @@ class ChatController(QObject):
         area = self.window.chat_areas.get("group")
         if area:
             area.set_online_count(len(filtered))
+
+    def _sync_initial_users(self) -> None:
+        """初始化后同步已在 UDP 模块中但尚未通知 UI 的在线用户。
+
+        修复竞态：UDP 模块在 ChatWindow 创建前就启动了，
+        首次 MSG_USER_LIST_REQUEST 的响应可能在信号连接前到达。
+        """
+        if self.udp and self.udp.running:
+            self.udp.sync_user_list()
 
     def _on_group_message(self, username, ip, content, timestamp) -> None:
         area = self.window.chat_areas.get("group")
