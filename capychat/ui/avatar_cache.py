@@ -17,6 +17,7 @@ from PySide6.QtGui import QPixmap, QPainter, QColor, QFont, QPainterPath
 from PySide6.QtSvg import QSvgRenderer
 
 from .theme import AVATAR_PALETTE
+from capychat._paths import asset_dir
 
 
 # =============================================================================
@@ -41,11 +42,8 @@ def get_avatar_color(username: str) -> str:
 # =============================================================================
 
 def _avatars_dir() -> str:
-    """返回 client/assets/avatars/ 目录的绝对路径。"""
-    return os.path.join(
-        os.path.dirname(os.path.dirname(__file__)),
-        "assets", "avatars"
-    )
+    """返回 assets/avatars/ 目录的绝对路径。"""
+    return asset_dir('avatars')
 
 
 # =============================================================================

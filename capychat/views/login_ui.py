@@ -14,6 +14,7 @@ from network.protocol import DEFAULT_UDP_PORT, DEFAULT_TCP_PORT
 from network.crypto import derive_key
 from views.chat_ui import ChatWindow
 from config_manager import load_config, save_config, DEFAULT_CONFIG
+from capychat._paths import asset_dir
 
 
 def _get_local_ips():
@@ -120,7 +121,7 @@ def _input(placeholder="", *, password=False, default_text=""):
 # 自定义 QComboBox：用 QIcon 画下拉箭头
 # ---------------------------------------------------------------------------
 
-_ICON_DIR = os.path.join(os.path.dirname(__file__), "..", "assets", "icons")
+_ICON_DIR = asset_dir('icons')
 _CHEVRON_DOWN = QIcon(os.path.join(_ICON_DIR, "chevron-down.svg"))
 _CHEVRON_UP = QIcon(os.path.join(_ICON_DIR, "chevron-up.svg"))
 _EYE_OPEN = QIcon(os.path.join(_ICON_DIR, "eye.svg"))
@@ -340,7 +341,7 @@ class LoginWindow(QWidget):
 
         # ---- Logo 图片（背景层，不影响布局）-------------------------------
         self._logo_pixmap: QPixmap | None = None
-        logo_path = os.path.join(os.path.dirname(__file__), "..", "assets", "images", "logo", "logo.png")
+        logo_path = os.path.join(asset_dir('images', 'logo'), "logo.png")
         if os.path.exists(logo_path):
             self._logo_pixmap = QPixmap(logo_path)
 
@@ -569,7 +570,7 @@ class LoginWindow(QWidget):
 
         # ---- 信号绑定 --------------------------------------------------
         self.confirm_btn.clicked.connect(self.try_connect)
-        self.reset_btn.clicked.connect(self._load_config_to_ui)
+        self.reset_btn.clicked.connect(self._reset_to_defaults)
 
     # ====================================================================
     # 业务逻辑（与原版完全一致）
@@ -632,6 +633,14 @@ class LoginWindow(QWidget):
         )
         self.chat_window.show()
         self.hide()
+
+    def _reset_to_defaults(self):
+        """恢复所有字段为程序默认值（不读 conf.json）。"""
+        self.local_ip.setCurrentText(DEFAULT_CONFIG["local_ip"])
+        self.udp_port.setText(str(DEFAULT_CONFIG["udp_port"]))
+        self.tcp_port.setText(str(DEFAULT_CONFIG["tcp_port"]))
+        self.username.setText(DEFAULT_CONFIG["username"])
+        self.room_password.setText(DEFAULT_CONFIG.get("room_password", ""))
 
     def _load_config_to_ui(self):
         """从 config_manager 加载配置到 UI 字段。"""

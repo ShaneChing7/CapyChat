@@ -12,10 +12,24 @@ ChatWindow 仅保留纯 UI（布局、渲染、窗口控制）。
 """
 
 import os
+import sys
 import base64
 import subprocess
 import platform
 from datetime import datetime
+
+
+def _get_received_dir() -> str:
+    """返回文件接收目录。
+
+    PyInstaller 打包后使用用户下载目录下的 CapyChat/，
+    开发模式下使用包目录下的 received/。
+    """
+    if getattr(sys, 'frozen', False):
+        dir_path = os.path.join(os.path.expanduser('~'), 'Downloads', 'CapyChat')
+        os.makedirs(dir_path, exist_ok=True)
+        return dir_path
+    return os.path.join(os.path.dirname(__file__), 'received')
 
 from PySide6.QtWidgets import (QWidget, QMessageBox, QFileDialog, QDialog,
                                QVBoxLayout, QHBoxLayout, QLabel, QPushButton)
@@ -243,7 +257,7 @@ class ChatController(QObject):
         self.ensure_private_area(addr, username)
         area = self.window.chat_areas.get(addr)
         if area:
-            recv_dir = os.path.join(os.path.dirname(__file__), "received")
+            recv_dir = _get_received_dir()
             os.makedirs(recv_dir, exist_ok=True)
             save_path = os.path.join(recv_dir,
                                      f"{datetime.now().strftime('%H%M%S')}_{file_name}")
@@ -548,7 +562,7 @@ class ChatController(QObject):
             area.insert_emoji(emoji)
 
     def _show_doc_center(self) -> None:
-        recv_dir = os.path.join(os.path.dirname(__file__), "received")
+        recv_dir = _get_received_dir()
         dlg = DocumentCenterDialog(
             received_dir=recv_dir,
             get_users=lambda: self.online_users,

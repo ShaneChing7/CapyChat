@@ -6,11 +6,27 @@
 
 import json
 import os
+import sys
 from typing import Any
 
 from network.protocol import DEFAULT_UDP_PORT, DEFAULT_TCP_PORT
 
-CONFIG_FILE = os.path.join(os.path.dirname(__file__), "conf.json")
+
+def _get_config_dir() -> str:
+    """返回 conf.json 所在目录。
+
+    PyInstaller 打包后使用 %APPDATA%/CapyChat/，
+    开发模式下使用包目录本身。
+    """
+    if getattr(sys, 'frozen', False):
+        base = os.environ.get('APPDATA', '') or os.path.expanduser('~')
+        dir_path = os.path.join(base, 'CapyChat')
+        os.makedirs(dir_path, exist_ok=True)
+        return dir_path
+    return os.path.dirname(__file__)
+
+
+CONFIG_FILE = os.path.join(_get_config_dir(), "conf.json")
 
 # 默认配置（新用户 / conf.json 不存在时使用）
 DEFAULT_CAPYBARA_API_KEY = "sk-e91bf487adbf43f096b91029f0d645b2"

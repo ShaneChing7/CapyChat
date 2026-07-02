@@ -6,10 +6,20 @@
 import json
 import socket
 import struct
+import sys
 import threading
 import time
 import os
 from typing import Optional
+
+
+def _get_received_dir() -> str:
+    """返回文件接收目录。"""
+    if getattr(sys, 'frozen', False):
+        dir_path = os.path.join(os.path.expanduser('~'), 'Downloads', 'CapyChat')
+        os.makedirs(dir_path, exist_ok=True)
+        return dir_path
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'received')
 
 from PySide6.QtCore import QObject, Signal
 
@@ -73,8 +83,7 @@ class TcpP2P(QObject):
         self._accept_thread: threading.Thread | None = None
 
         # --- 文件传输管理器 ---
-        recv_dir = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "..", "received")
+        recv_dir = _get_received_dir()
         self.file_mgr = FileTransferManager(
             recv_dir=recv_dir,
             send_callback=self._send_tcp,

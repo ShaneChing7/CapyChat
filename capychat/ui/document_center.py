@@ -14,6 +14,7 @@ from PySide6.QtGui import QIcon, QPixmap, QPainter, QColor, QCursor
 from .theme import (BG_APP, BG_SIDEBAR, BORDER, BORDER_LIGHT, PRIMARY,
                     PRIMARY_DARK, TEXT_PRIMARY, TEXT_SECONDARY,
                     TEXT_HINT, RADIUS_WINDOW, RADIUS_XS)
+from capychat._paths import asset_dir
 
 
 def _format_size(size_bytes):
@@ -34,7 +35,7 @@ def _file_type_label(name):
 
 
 def _icon_dir():
-    return os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "icons")
+    return asset_dir('icons')
 
 
 class _FileRow(QWidget):
@@ -305,6 +306,51 @@ class DocumentCenterDialog(QDialog):
         sep.setStyleSheet(f"background: {BORDER_LIGHT}; border: none;")
         root.addWidget(sep)
 
+        # ---- 接收目录路径 ----
+        path_row = QHBoxLayout()
+        path_label = QLabel("接收目录：")
+        path_label.setStyleSheet(f"""
+            QLabel {{
+                font-size: 11px;
+                color: {TEXT_HINT};
+                background: transparent;
+                border: none;
+            }}
+        """)
+        path_row.addWidget(path_label)
+
+        self._path_value = QLabel(self._received_dir)
+        self._path_value.setStyleSheet(f"""
+            QLabel {{
+                font-size: 11px;
+                color: {TEXT_SECONDARY};
+                background: transparent;
+                border: none;
+            }}
+        """)
+        self._path_value.setWordWrap(True)
+        path_row.addWidget(self._path_value, 1)
+
+        open_dir_btn = QPushButton("打开目录")
+        open_dir_btn.setCursor(Qt.PointingHandCursor)
+        open_dir_btn.setStyleSheet(f"""
+            QPushButton {{
+                font-size: 11px;
+                padding: 2px 10px;
+                border: 0.5px solid {BORDER};
+                border-radius: {RADIUS_XS}px;
+                background: transparent;
+                color: {PRIMARY};
+            }}
+            QPushButton:hover {{
+                background: {BG_SIDEBAR};
+            }}
+        """)
+        open_dir_btn.clicked.connect(self._open_received_dir)
+        path_row.addWidget(open_dir_btn)
+
+        root.addLayout(path_row)
+
         # ---- 文件列表 ----
         self._list = QListWidget()
         self._list.setStyleSheet(f"""
@@ -438,6 +484,21 @@ class DocumentCenterDialog(QDialog):
             QMessageBox.warning(self, "删除完成",
                                 f"已删除 {len(files) - errors} 个文件，{errors} 个文件删除失败。")
         self._refresh()
+
+    def _open_received_dir(self):
+        """在资源管理器中打开接收目录。"""
+        if not self._received_dir:
+            return
+        try:
+            os.startfile(self._received_dir)
+        except Exception:
+            # 目录不存在则尝试用 subprocess
+            if platform.system() == "Windows":
+                subprocess.run(["explorer", self._received_dir])
+            elif platform.system() == "Darwin":
+                subprocess.run(["open", self._received_dir])
+            else:
+                subprocess.run(["xdg-open", self._received_dir])
 
     def _on_share(self, file_path, _):
         """弹出分享菜单：广场 + 在线用户列表。"""

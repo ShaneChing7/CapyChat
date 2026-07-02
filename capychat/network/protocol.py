@@ -13,8 +13,8 @@ from .crypto import encrypt, try_decrypt, PLAINTEXT_FLAG
 # =============================================================================
 # 网络常量
 # =============================================================================
-DEFAULT_UDP_PORT = 9000
-DEFAULT_TCP_PORT = 9001
+DEFAULT_UDP_PORT = 18851
+DEFAULT_TCP_PORT = 24239
 BROADCAST_ADDR = "255.255.255.255"
 MAX_UDP_SIZE = 60000
 TCP_CHUNK_SIZE = 65536

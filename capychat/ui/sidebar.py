@@ -1,6 +1,7 @@
 """侧边栏组件：用户信息、频道列表、退出按钮。"""
 
 import os
+import sys
 
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                                QListWidget, QListWidgetItem, QPushButton,
@@ -15,6 +16,7 @@ from .theme import (BG_SIDEBAR, BORDER, PRIMARY, TEXT_PRIMARY,
                     RADIUS_WINDOW)
 from .avatar_cache import AvatarWidget, avatar_cache
 from .capybara_widget import CapybaraWidget
+from capychat._paths import asset_dir
 
 
 _ONLINE_ROLE = Qt.UserRole + 1   # 存储在线状态: True/False
@@ -98,10 +100,12 @@ class SidebarWidget(QWidget):
         self._channel_data: dict[str, dict] = {}  # channel_id → {text, online, unread, avatar}
         self._online_count = 0
         self._searching = False
-        self._icon_dir = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)), "assets", "icons")
-        self._received_dir = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)), "received")
+        self._icon_dir = asset_dir('icons')
+        self._received_dir = (
+            os.path.join(os.path.expanduser('~'), 'Downloads', 'CapyChat')
+            if getattr(sys, 'frozen', False)
+            else os.path.join(os.path.dirname(os.path.dirname(__file__)), 'received')
+        )
         self.initUI()
 
     def paintEvent(self, event):

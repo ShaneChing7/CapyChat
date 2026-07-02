@@ -18,9 +18,10 @@ from PySide6.QtCore import Qt, QTimer, Signal, QSize
 from PySide6.QtGui import QPixmap
 
 from .theme import BORDER, TEXT_PRIMARY, BG_APP
+from capychat._paths import asset_dir
 
 
-_IMG_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "images", "capybara")
+_IMG_DIR = asset_dir('images', 'capybara')
 
 
 class CapybaraState(Enum):
@@ -180,8 +181,7 @@ class CapybaraWidget(QWidget):
         from PySide6.QtGui import QIcon
         from PySide6.QtCore import QTimer
 
-        _icons_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)),
-                                  "assets", "icons")
+        _icons_dir = asset_dir('icons')
 
         popup = QFrame()
         popup.setWindowFlags(Qt.Popup | Qt.FramelessWindowHint

@@ -12,10 +12,11 @@ from PySide6.QtGui import QPainter, QPixmap
 
 from .message_bubble import (SystemMessageWidget, MessageBubbleWidget,
                                BubbleWidget)
+from capychat._paths import asset_dir
 
 
 # 背景图片目录
-_BG_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "images", "backgrounds")
+_BG_DIR = asset_dir('images', 'backgrounds')
 
 _BG_FILES = {
     "single": os.path.join(_BG_DIR, "bg_single.png"),

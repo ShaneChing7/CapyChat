@@ -13,7 +13,8 @@ from .theme import (BG_APP, BG_SIDEBAR, BG_INPUT, BORDER, BORDER_LIGHT,
                     TEXT_HINT, GREEN_ONLINE, RADIUS_BUBBLE, RADIUS_XS)
 from .message_list import MessageListWidget
 from .message_bubble import (MessageBubbleWidget, SystemMessageWidget,
-                               ImageBubbleWidget, FileBubbleWidget)
+                               BubbleWidget, ImageBubbleWidget, FileBubbleWidget)
+from capychat._paths import asset_dir
 
 
 class ChatAreaWidget(QWidget):
@@ -37,8 +38,7 @@ class ChatAreaWidget(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._icon_dir = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)), "assets", "icons")
+        self._icon_dir = asset_dir('icons')
         self._channel_id = "group"
         self._online_count = 0
         self._channel_title = "广场"

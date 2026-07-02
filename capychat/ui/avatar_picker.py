@@ -24,6 +24,7 @@ from PySide6.QtGui import QPixmap, QPainter, QColor, QFont, QIcon
 from .avatar_cache import AvatarCache, AvatarWidget, avatar_cache, get_avatar_color
 from .theme import (PRIMARY, PRIMARY_DARK, BG_APP, TEXT_PRIMARY,
                     TEXT_SECONDARY, TEXT_HINT, BORDER, RADIUS_WINDOW)
+from capychat._paths import asset_dir
 
 
 # =============================================================================
@@ -385,11 +386,8 @@ class AvatarPickerDialog(QDialog):
 
     @staticmethod
     def _list_svg_avatars() -> list[str]:
-        """列出 client/assets/avatars/ 下所有可用 SVG 文件名（不含扩展名）。"""
-        avatars_dir = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)),
-            "assets", "avatars"
-        )
+        """列出 assets/avatars/ 下所有可用 SVG 文件名（不含扩展名）。"""
+        avatars_dir = asset_dir('avatars')
         if not os.path.isdir(avatars_dir):
             return []
         names = []

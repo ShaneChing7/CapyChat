@@ -10,9 +10,9 @@ from PySide6.QtGui import QFont, QColor, QIcon
 
 from .theme import (PRIMARY, PRIMARY_DARK, BG_APP, TEXT_PRIMARY,
                     TEXT_SECONDARY, TEXT_HINT, BORDER, RADIUS_WINDOW)
+from capychat._paths import asset_dir
 
-_ICONS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)),
-                          "assets", "icons")
+_ICONS_DIR = asset_dir('icons')
 
 WIN_W = 480
 WIN_H = 440
